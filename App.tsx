@@ -1,9 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import { evaluateArticle } from './services/geminiService.ts';
 import { Scorecard } from './components/Scorecard.tsx';
 
-// Declare external globals to satisfy TypeScript
+// Declare external globals for TS
 declare global {
   interface Window {
     mammoth: any;
@@ -12,21 +12,23 @@ declare global {
 }
 
 const App = () => {
-  const [state, setState] = useState({
+  // Use React.useState to avoid destructuring issues in some browser environments
+  const [state, setState] = React.useState({
     draft: '',
     evaluation: null,
     isLoading: false,
     error: null,
   } as any);
-  const [googleDocLink, setGoogleDocLink] = useState('');
-  const [isDragging, setIsDragging] = useState(false);
-  const [showLinkInput, setShowLinkInput] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('AOTA_API_KEY') || '');
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [googleDocLink, setGoogleDocLink] = React.useState('');
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [showLinkInput, setShowLinkInput] = React.useState(false);
+  const [showSettings, setShowSettings] = React.useState(false);
+  const [apiKey, setApiKey] = React.useState(localStorage.getItem('AOTA_API_KEY') || '');
+  
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (apiKey) {
       localStorage.setItem('AOTA_API_KEY', apiKey);
     }

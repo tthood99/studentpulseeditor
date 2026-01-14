@@ -12,9 +12,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
-    <!-- React & ReactDOM (UMD) -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <!-- React & ReactDOM (UMD) - Loading version 18 for best compatibility with Babel standalone -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     
     <!-- Babel for browser-side TSX transpilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -34,19 +34,17 @@
     <div id="root"></div>
     
     <script>
+      // Initialize PDF.js worker
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 
-    <!-- App Logic Inlined to ensure it loads even if external file requests fail -->
+    <!-- The App Logic -->
     <script type="text/babel" data-type="module">
-      import { GoogleGenAI, Type } from "@google/genai";
-      
-      // We'll use the components defined in other files by importing them relatively
-      // But to ensure the app boots, we'll use a direct approach for the entry point.
       import App from './App.tsx';
 
       const rootElement = document.getElementById('root');
       if (rootElement) {
+        // Use the global ReactDOM from the UMD script
         const root = ReactDOM.createRoot(rootElement);
         root.render(
           <React.StrictMode>
