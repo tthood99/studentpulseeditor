@@ -1,0 +1,5 @@
+{
+  "name": "AOTA Student Pulse Editor",
+  "description": "A mentorship-driven editor tool for OT and OTA students to refine their articles for the AOTA Student Pulse newsletter using Gemini AI.",
+  "requestFramePermissions": []
+}
