@@ -12,7 +12,6 @@ declare global {
 }
 
 const App = () => {
-  // Use React.useState to avoid destructuring issues in some browser environments
   const [state, setState] = React.useState({
     draft: '',
     evaluation: null,
@@ -74,6 +73,16 @@ const App = () => {
     }
   };
 
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
   const onDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -93,6 +102,12 @@ const App = () => {
     } catch (err: any) {
       setState((prev: any) => ({ ...prev, error: err.message, isLoading: false }));
     }
+  };
+
+  const copyOriginalDraft = () => {
+    if (!state.draft) return;
+    navigator.clipboard.writeText(state.draft);
+    alert('Original draft copied to clipboard!');
   };
 
   return (
@@ -157,6 +172,15 @@ const App = () => {
                 Draft Submission
               </h2>
               <div className="flex space-x-2">
+                {state.draft && (
+                   <button 
+                   onClick={copyOriginalDraft}
+                   className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1 rounded transition-colors flex items-center"
+                   title="Copy original draft"
+                 >
+                   <i className="fas fa-copy mr-1"></i> Copy
+                 </button>
+                )}
                 <button 
                   onClick={() => setShowLinkInput(!showLinkInput)}
                   className={`text-xs px-3 py-1 rounded transition-colors flex items-center ${showLinkInput ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
@@ -197,20 +221,21 @@ const App = () => {
             )}
 
             <div 
-              onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-              onDragLeave={() => setIsDragging(false)}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
               onDrop={onDrop}
-              className={`relative transition-all duration-200 ${isDragging ? 'scale-[1.01]' : ''}`}
+              className={`relative group transition-all duration-200 ${isDragging ? 'ring-4 ring-blue-500 ring-opacity-50' : ''}`}
             >
               {isDragging && (
-                <div className="absolute inset-0 z-10 bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg flex items-center justify-center pointer-events-none">
-                  <div className="bg-white px-4 py-2 rounded-full shadow-lg text-blue-600 font-bold animate-bounce">
-                    Drop to extract text
+                <div className="absolute inset-0 z-10 bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg flex items-center justify-center pointer-events-none backdrop-blur-[1px]">
+                  <div className="bg-white px-6 py-3 rounded-full shadow-2xl text-blue-600 font-bold animate-bounce flex items-center">
+                    <i className="fas fa-file-alt mr-3 text-2xl"></i>
+                    Drop to extract draft text
                   </div>
                 </div>
               )}
               <textarea
-                className="w-full h-80 p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all outline-none text-gray-700 leading-relaxed"
+                className={`w-full h-80 p-4 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all outline-none text-gray-700 leading-relaxed font-serif ${isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
                 placeholder={googleDocLink ? "Add any specific instructions or notes for the editor here..." : "Paste your draft or drag & drop a .docx/.pdf here..."}
                 value={state.draft}
                 onChange={(e) => setState((prev: any) => ({ ...prev, draft: e.target.value }))}
@@ -303,7 +328,7 @@ const App = () => {
                     <button 
                       onClick={() => { 
                         navigator.clipboard.writeText(state.evaluation?.polishedDraft || ''); 
-                        alert('Copied!'); 
+                        alert('Polished draft copied to clipboard!'); 
                       }} 
                       className="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded transition-colors uppercase font-bold"
                     >

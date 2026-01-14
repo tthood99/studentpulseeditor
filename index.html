@@ -73,42 +73,66 @@
           return 'bg-red-100 text-red-800 border-red-200';
         };
 
-        // Calculate score based on 5 boolean criteria + word count check
-        const criteria = [
+        const criteriaMet = [
           scorecard.conversationalTone,
           scorecard.scannability,
           scorecard.creativeFormatting,
           scorecard.packaging,
           scorecard.adminCheck,
           scorecard.wordCount <= 750
-        ];
-        const metCount = criteria.filter(Boolean).length;
-        const percentage = Math.round((metCount / criteria.length) * 100);
+        ].filter(Boolean).length;
+        
+        const percentage = Math.round((criteriaMet / 6) * 100);
 
         return (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <div className="bg-blue-600 px-6 py-4"><h3 className="text-white font-bold">Section 1: The Pulse Readiness Scorecard</h3></div>
-            <div className="p-6 space-y-4">
+            <div className="bg-blue-600 px-6 py-4">
+              <h3 className="text-white font-bold">Section 1: The Pulse Readiness Scorecard</h3>
+            </div>
+            <div className="p-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="flex items-center"><CheckIcon checked={scorecard.conversationalTone}/><span className="text-sm">Conversational Tone</span></div>
-                <div className="flex items-center"><CheckIcon checked={scorecard.scannability}/><span className="text-sm">Scannability</span></div>
-                <div className="flex items-center"><CheckIcon checked={scorecard.creativeFormatting}/><span className="text-sm">Creative Formatting</span></div>
-                <div className="flex items-center"><CheckIcon checked={scorecard.packaging}/><span className="text-sm">Packaging</span></div>
-                <div className="flex items-center"><CheckIcon checked={scorecard.adminCheck}/><span className="text-sm">Admin Check</span></div>
-                <div className="flex items-center text-sm font-medium">Word Count: {scorecard.wordCount} / 750</div>
-              </div>
-              <div className="mt-4 pt-4 border-t space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-gray-700">Rating:</span>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getRatingColor(rating)}`}>{rating}</span>
+                <div className="flex items-center"><CheckIcon checked={scorecard.conversationalTone}/><span className="text-sm text-gray-600">Conversational Tone</span></div>
+                <div className="flex items-center"><CheckIcon checked={scorecard.scannability}/><span className="text-sm text-gray-600">Scannability</span></div>
+                <div className="flex items-center"><CheckIcon checked={scorecard.creativeFormatting}/><span className="text-sm text-gray-600">Creative Formatting</span></div>
+                <div className="flex items-center"><CheckIcon checked={scorecard.packaging}/><span className="text-sm text-gray-600">Packaging</span></div>
+                <div className="flex items-center"><CheckIcon checked={scorecard.adminCheck}/><span className="text-sm text-gray-600">Admin Check</span></div>
+                <div className="flex items-center">
+                   <span className={`mr-2 w-6 h-6 flex items-center justify-center rounded border ${scorecard.wordCount <= 750 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-red-50 border-red-200 text-red-600'}`}>
+                      <i className="fas fa-calculator text-[10px]"></i>
+                   </span>
+                   <span className="text-sm text-gray-600">Word Count: {scorecard.wordCount} / 750</span>
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold text-gray-700">Readiness Score:</span>
+              </div>
+
+              <div className="mt-4 pt-6 border-t border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Overall Rating</span>
                   <div className="flex items-center gap-3">
-                    <div className="w-24 bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full transition-all duration-1000" style={{ width: `${percentage}%` }}></div>
-                    </div>
-                    <span className="text-lg font-black text-blue-600">{percentage}%</span>
+                    <span className={`px-4 py-1.5 rounded-full text-sm font-bold border shadow-sm ${getRatingColor(rating)}`}>
+                      {rating}
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4 bg-gray-50 px-4 py-2 rounded-lg border border-gray-100">
+                  <div className="text-right">
+                    <span className="block text-[10px] font-bold text-gray-400 uppercase">Author Score</span>
+                    <span className="text-2xl font-black text-blue-600 leading-none">{percentage}%</span>
+                  </div>
+                  <div className="w-12 h-12 rounded-full border-4 border-gray-200 relative flex items-center justify-center">
+                    <svg className="absolute inset-0 w-full h-full -rotate-90">
+                      <circle 
+                        cx="24" cy="24" r="20" 
+                        fill="transparent" 
+                        stroke="currentColor" 
+                        strokeWidth="4" 
+                        className="text-blue-500"
+                        strokeDasharray={125.6}
+                        strokeDashoffset={125.6 - (125.6 * percentage) / 100}
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <i className="fas fa-star text-blue-200 text-xs"></i>
                   </div>
                 </div>
               </div>
@@ -132,7 +156,7 @@
           try {
             const response = await ai.models.generateContent({
               model: "gemini-3-pro-preview",
-              contents: `Evaluate: ${googleLink ? 'Link: ' + googleLink : ''} Content: ${state.draft}`,
+              contents: `Evaluate this article: ${googleLink ? 'Link: ' + googleLink : ''} \n\n Content: ${state.draft}`,
               config: {
                 systemInstruction: SYSTEM_INSTRUCTION,
                 responseMimeType: "application/json",
@@ -184,22 +208,27 @@
           } catch (err) { alert(err.message); }
         };
 
+        const copyDraft = () => {
+            if (!state.draft) return;
+            navigator.clipboard.writeText(state.draft);
+            alert("Draft copied to clipboard!");
+        };
+
         return (
           <div className="max-w-6xl mx-auto px-4 py-12">
             {showSettings && (
               <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
                 <div className="bg-white rounded-xl p-8 max-w-md w-full shadow-2xl">
-                  <h3 className="text-xl font-bold mb-4">API Configuration</h3>
-                  <p className="text-xs text-gray-500 mb-4">Your key is stored locally and never sent to our servers.</p>
-                  <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Gemini API Key" className="w-full p-3 border rounded-lg mb-4 focus:ring-2 focus:ring-blue-500 outline-none" />
-                  <button onClick={() => setShowSettings(false)} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors">Save & Close</button>
+                  <h3 className="text-xl font-bold mb-4">Settings</h3>
+                  <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Gemini API Key" className="w-full p-3 border rounded-lg mb-4" />
+                  <button onClick={() => setShowSettings(false)} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold">Save & Close</button>
                 </div>
               </div>
             )}
 
             <header className="mb-12 text-center relative">
-              <button onClick={() => setShowSettings(true)} className="absolute right-0 top-0 text-gray-400 hover:text-blue-600 transition-colors"><i className="fas fa-cog text-xl"></i></button>
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600"><i className="fas fa-hands-holding text-3xl"></i></div>
+              <button onClick={() => setShowSettings(true)} className="absolute right-0 top-0 text-gray-400 hover:text-blue-600"><i className="fas fa-cog text-xl"></i></button>
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 shadow-sm"><i className="fas fa-hands-holding text-3xl"></i></div>
               <h1 className="text-4xl font-black text-gray-900">Student Pulse Editor</h1>
               <p className="text-gray-500 mt-2 italic">Mentorship Tool for AOTA Student Contributors</p>
             </header>
@@ -209,24 +238,22 @@
                 <div className="bg-white p-6 rounded-xl border shadow-sm">
                   <div className="flex justify-between items-center mb-4">
                     <h2 className="font-bold text-gray-700">Article Draft</h2>
-                    <button onClick={() => fileRef.current.click()} className="text-xs text-blue-600 font-bold hover:underline flex items-center">
-                      <i className="fas fa-file-upload mr-1"></i> Upload doc/pdf
-                    </button>
+                    <div className="flex gap-4">
+                        <button onClick={copyDraft} className="text-xs text-gray-500 font-bold hover:text-blue-600 flex items-center">
+                          <i className="fas fa-copy mr-1"></i> Copy Draft
+                        </button>
+                        <button onClick={() => fileRef.current.click()} className="text-xs text-blue-600 font-bold hover:underline">
+                          <i className="fas fa-file-upload mr-1"></i> Upload doc/pdf
+                        </button>
+                    </div>
                     <input type="file" ref={fileRef} hidden onChange={onFile} />
                   </div>
-                  <div className="relative mb-3">
-                    <i className="fas fa-link absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs"></i>
-                    <input value={googleLink} onChange={e => setGoogleLink(e.target.value)} placeholder="Paste Google Doc Link (Optional)" className="w-full pl-8 pr-3 py-2 text-sm border rounded bg-gray-50 focus:bg-white outline-none focus:ring-1 focus:ring-blue-500" />
-                  </div>
-                  <textarea value={state.draft} onChange={e => setState(s => ({ ...s, draft: e.target.value }))} className="w-full h-96 p-4 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 transition-all font-serif text-lg leading-relaxed" placeholder="Paste your article text here..." />
-                  <button onClick={handleEvaluate} disabled={state.isLoading} className="w-full mt-4 py-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-md transform active:scale-[0.98] transition-all disabled:bg-gray-400 disabled:scale-100 flex items-center justify-center gap-2">
-                    {state.isLoading ? (
-                      <><i className="fas fa-spinner fa-spin"></i> Mentoring...</>
-                    ) : (
-                      <><i className="fas fa-magic"></i> Evaluate & Mentor</>
-                    )}
+                  <input value={googleLink} onChange={e => setGoogleLink(e.target.value)} placeholder="Paste Google Doc Link (Optional)" className="w-full p-2 text-sm border rounded mb-3 bg-gray-50 focus:bg-white outline-none" />
+                  <textarea value={state.draft} onChange={e => setState(s => ({ ...s, draft: e.target.value }))} className="w-full h-[450px] p-4 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-serif text-lg leading-relaxed" placeholder="Paste your article text here..." />
+                  <button onClick={handleEvaluate} disabled={state.isLoading} className="w-full mt-4 py-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors disabled:bg-gray-400 flex items-center justify-center gap-2">
+                    {state.isLoading ? <><i className="fas fa-spinner fa-spin"></i> Mentoring...</> : "Evaluate Draft"}
                   </button>
-                  {state.error && <p className="mt-2 text-red-500 text-xs text-center"><i className="fas fa-exclamation-triangle mr-1"></i> {state.error}</p>}
+                  {state.error && <p className="mt-2 text-red-500 text-xs text-center">{state.error}</p>}
                 </div>
               </div>
 
@@ -235,36 +262,25 @@
                   <>
                     <Scorecard scorecard={state.evaluation.scorecard} rating={state.evaluation.readinessRating} />
                     <div className="bg-amber-50 border-l-4 border-amber-500 p-6 rounded-r-xl shadow-sm">
-                      <h3 className="font-bold text-amber-900 mb-3 flex items-center gap-2">
-                        <i className="fas fa-lightbulb"></i> Section 2: Editor's Notes
-                      </h3>
+                      <h3 className="font-bold text-amber-900 mb-3 flex items-center gap-2"><i className="fas fa-lightbulb"></i> Editor's Notes</h3>
                       <ul className="space-y-3">
-                        {state.evaluation.editorNotes.map((n, i) => (
-                          <li key={i} className="text-sm text-amber-800 flex gap-3 leading-relaxed">
-                            <span className="font-bold bg-amber-200/50 w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 text-[10px]">{i+1}</span>
-                            {n}
-                          </li>
-                        ))}
+                        {state.evaluation.editorNotes.map((n, i) => <li key={i} className="text-sm text-amber-800 flex gap-2"><span>•</span>{n}</li>)}
                       </ul>
                     </div>
                     <div className="bg-white border rounded-xl overflow-hidden shadow-sm">
                       <div className="bg-indigo-600 p-4 text-white font-bold flex justify-between items-center">
-                        <span>Section 3: Polished Draft</span>
-                        <button onClick={() => {
-                          navigator.clipboard.writeText(state.evaluation.polishedDraft);
-                          alert("Draft copied to clipboard!");
-                        }} className="text-[10px] uppercase bg-white/20 hover:bg-white/30 px-2 py-1 rounded">Copy Text</button>
+                        <span>Polished Draft</span>
+                        <button onClick={() => { navigator.clipboard.writeText(state.evaluation.polishedDraft); alert("Copied!"); }} className="text-xs bg-white/20 px-2 py-1 rounded">Copy</button>
                       </div>
-                      <div className="p-8 text-gray-800 whitespace-pre-wrap leading-loose font-serif text-lg bg-gray-50/30">
-                        {state.evaluation.polishedDraft.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className="text-blue-700 bg-blue-50 px-1 rounded border-b border-blue-200">{part}</strong> : part)}
+                      <div className="p-8 text-gray-800 whitespace-pre-wrap leading-relaxed font-serif text-lg">
+                        {state.evaluation.polishedDraft.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className="text-blue-700 bg-blue-50 px-1">{part}</strong> : part)}
                       </div>
                     </div>
                   </>
                 ) : (
                   <div className="h-full min-h-[400px] flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl text-gray-400 bg-white/50">
-                    <div className="mb-4 text-6xl opacity-10"><i className="fas fa-file-signature"></i></div>
-                    <p className="text-lg font-medium">Ready to review your work?</p>
-                    <p className="text-sm">Submit your draft on the left to see the scorecard.</p>
+                    <i className="fas fa-file-signature text-4xl mb-4 opacity-20"></i>
+                    <p className="text-center">Submit your draft to receive a readiness scorecard and editor notes.</p>
                   </div>
                 )}
               </div>
