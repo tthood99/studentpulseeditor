@@ -34,7 +34,21 @@
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 
-    <!-- Use Babel to process the TSX file -->
-    <script type="text/babel" data-type="module" src="./index.tsx"></script>
+    <!-- Use Babel to process the entry point directly -->
+    <script type="text/babel" data-type="module">
+      import React from 'react';
+      import { createRoot } from 'react-dom/client';
+      import App from './App.tsx';
+
+      const rootElement = document.getElementById('root');
+      if (rootElement) {
+        const root = createRoot(rootElement);
+        root.render(
+          <React.StrictMode>
+            <App />
+          </React.StrictMode>
+        );
+      }
+    </script>
 </body>
 </html>
