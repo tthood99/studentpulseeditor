@@ -2,8 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { EvaluationResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
-
 const SYSTEM_INSTRUCTION = `
 You are the Senior Editor for the American Occupational Therapy Association (AOTA) "Student Pulse" e-newsletter. 
 Your goal is to mentor OT and OTA students to refine their articles for publication.
@@ -25,7 +23,16 @@ For Section 3 (Polished Draft), rewrite the article to meet the criteria.
 Fix flow, insert headings, use person-first language, and BOLD your edits using markdown **text**.
 `;
 
-export const evaluateArticle = async (draft: string): Promise<EvaluationResult> => {
+export const evaluateArticle = async (draft: string, overrideApiKey?: string): Promise<EvaluationResult> => {
+  // Use the provided key, or the environment variable
+  const keyToUse = overrideApiKey || process.env.API_KEY || '';
+  
+  if (!keyToUse) {
+    throw new Error("No API Key found. Please add it in Settings (top right).");
+  }
+
+  const ai = new GoogleGenAI({ apiKey: keyToUse });
+
   try {
     const response = await ai.models.generateContent({
       model: "gemini-3-pro-preview",
@@ -66,8 +73,11 @@ export const evaluateArticle = async (draft: string): Promise<EvaluationResult> 
 
     const result = JSON.parse(response.text || "{}");
     return result as EvaluationResult;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
-    throw new Error("Failed to evaluate the article. Please check your API key and connection.");
+    if (error.message?.includes('403')) {
+      throw new Error("API Key invalid or restricted. Please check your settings.");
+    }
+    throw new Error("Failed to evaluate the article. Please check your connection.");
   }
 };

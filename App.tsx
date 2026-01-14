@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { AppState } from './types';
 import { evaluateArticle } from './services/geminiService';
 import { Scorecard } from './components/Scorecard';
@@ -17,7 +17,17 @@ const App: React.FC = () => {
   const [googleDocLink, setGoogleDocLink] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [apiKey, setApiKey] = useState(localStorage.getItem('AOTA_API_KEY') || '');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync API Key to localStorage
+  useEffect(() => {
+    if (apiKey) {
+      localStorage.setItem('AOTA_API_KEY', apiKey);
+    }
+  }, [apiKey]);
 
   const extractTextFromDocx = async (file: File): Promise<string> => {
     const arrayBuffer = await file.arrayBuffer();
@@ -53,7 +63,7 @@ const App: React.FC = () => {
       }
       
       setState(prev => ({ ...prev, draft: text, isLoading: false }));
-      setGoogleDocLink(''); // Clear link if file is uploaded
+      setGoogleDocLink('');
     } catch (err: any) {
       setState(prev => ({ ...prev, error: err.message, isLoading: false }));
     }
@@ -73,7 +83,8 @@ const App: React.FC = () => {
 
     setState(prev => ({ ...prev, isLoading: true, error: null, evaluation: null }));
     try {
-      const result = await evaluateArticle(submission);
+      // Pass the local API key if provided, otherwise rely on process.env
+      const result = await evaluateArticle(submission, apiKey || undefined);
       setState(prev => ({ ...prev, evaluation: result, isLoading: false }));
     } catch (err: any) {
       setState(prev => ({ ...prev, error: err.message, isLoading: false }));
@@ -82,9 +93,46 @@ const App: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
-      <header className="mb-10 text-center">
-        <div className="inline-flex items-center justify-center p-3 mb-4 rounded-full bg-blue-100 text-blue-600">
-          <i className="fas fa-stethoscope text-3xl"></i>
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
+            <h3 className="text-xl font-bold mb-4 flex items-center">
+              <i className="fas fa-cog mr-2 text-gray-500"></i> Editor Settings
+            </h3>
+            <div className="mb-6">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">Gemini API Key</label>
+              <input 
+                type="password"
+                placeholder="Enter your API key..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+              <p className="mt-2 text-xs text-gray-500 italic">
+                Your key is stored locally in your browser and used only for requests to Google Gemini.
+              </p>
+            </div>
+            <button 
+              onClick={() => setShowSettings(false)}
+              className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 transition-colors"
+            >
+              Save & Close
+            </button>
+          </div>
+        </div>
+      )}
+
+      <header className="mb-10 text-center relative">
+        <button 
+          onClick={() => setShowSettings(true)}
+          className="absolute right-0 top-0 p-2 text-gray-400 hover:text-blue-600 transition-colors"
+          title="Settings"
+        >
+          <i className="fas fa-cog text-xl"></i>
+        </button>
+        <div className="inline-flex items-center justify-center p-4 mb-4 rounded-full bg-blue-100 text-blue-600 shadow-inner">
+          <i className="fas fa-hands-holding text-4xl"></i>
         </div>
         <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Student Pulse Senior Editor</h1>
         <p className="text-lg text-gray-600 max-w-2xl mx-auto">
@@ -248,12 +296,26 @@ const App: React.FC = () => {
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="bg-indigo-600 px-6 py-4 flex items-center justify-between">
                   <h3 className="text-white font-bold text-lg">Section 3: The Polished Draft</h3>
-                  <button onClick={() => { navigator.clipboard.writeText(state.evaluation?.polishedDraft || ''); alert('Copied!'); }} className="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded transition-colors uppercase font-bold">Copy</button>
+                  <div className="flex space-x-2">
+                    <button 
+                      onClick={() => { 
+                        navigator.clipboard.writeText(state.evaluation?.polishedDraft || ''); 
+                        alert('Copied!'); 
+                      }} 
+                      className="text-xs bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded transition-colors uppercase font-bold"
+                    >
+                      Copy
+                    </button>
+                  </div>
                 </div>
                 <div className="p-6 prose prose-blue max-w-none">
-                  <div className="p-4 bg-gray-50 border-l-4 border-indigo-500 text-sm text-gray-500 italic mb-6">Note: Edits for tone, flow, and formatting are <strong>bolded</strong>.</div>
+                  <div className="p-4 bg-gray-50 border-l-4 border-indigo-500 text-sm text-gray-500 italic mb-6">
+                    Note: Edits for tone, flow, and formatting are <strong>bolded</strong>.
+                  </div>
                   <div className="text-gray-800 whitespace-pre-wrap leading-relaxed font-serif">
-                    {state.evaluation.polishedDraft.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className="text-blue-700 bg-blue-50 px-1 rounded">{part}</strong> : part)}
+                    {state.evaluation.polishedDraft.split('**').map((part, i) => 
+                      i % 2 === 1 ? <strong key={i} className="text-blue-700 bg-blue-50 px-1 rounded font-bold">{part}</strong> : part
+                    )}
                   </div>
                 </div>
               </div>
