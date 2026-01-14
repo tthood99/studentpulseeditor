@@ -31,6 +31,7 @@ export const evaluateArticle = async (draft: string, overrideApiKey?: string): P
     throw new Error("No API Key found. Please add it in Settings (top right).");
   }
 
+  // Always create a new instance to ensure the most up-to-date API key is used
   const ai = new GoogleGenAI({ apiKey: keyToUse });
 
   try {
@@ -75,7 +76,7 @@ export const evaluateArticle = async (draft: string, overrideApiKey?: string): P
     return result as EvaluationResult;
   } catch (error: any) {
     console.error("Gemini API Error:", error);
-    if (error.message?.includes('403')) {
+    if (error.message?.includes('403') || error.message?.includes('Requested entity was not found')) {
       throw new Error("API Key invalid or restricted. Please check your settings.");
     }
     throw new Error("Failed to evaluate the article. Please check your connection.");

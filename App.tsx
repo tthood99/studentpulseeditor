@@ -1,19 +1,23 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { AppState } from './types';
-import { evaluateArticle } from './services/geminiService';
-import { Scorecard } from './components/Scorecard';
+import { evaluateArticle } from './services/geminiService.ts';
+import { Scorecard } from './components/Scorecard.tsx';
 
-declare const mammoth: any;
-declare const pdfjsLib: any;
+// Declare external globals to satisfy TypeScript
+declare global {
+  interface Window {
+    mammoth: any;
+    pdfjsLib: any;
+  }
+}
 
-const App: React.FC = () => {
-  const [state, setState] = useState<AppState>({
+const App = () => {
+  const [state, setState] = useState({
     draft: '',
     evaluation: null,
     isLoading: false,
     error: null,
-  });
+  } as any);
   const [googleDocLink, setGoogleDocLink] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -22,22 +26,21 @@ const App: React.FC = () => {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync API Key to localStorage
   useEffect(() => {
     if (apiKey) {
       localStorage.setItem('AOTA_API_KEY', apiKey);
     }
   }, [apiKey]);
 
-  const extractTextFromDocx = async (file: File): Promise<string> => {
+  const extractTextFromDocx = async (file: File) => {
     const arrayBuffer = await file.arrayBuffer();
-    const result = await mammoth.extractRawText({ arrayBuffer });
+    const result = await window.mammoth.extractRawText({ arrayBuffer });
     return result.value;
   };
 
-  const extractTextFromPdf = async (file: File): Promise<string> => {
+  const extractTextFromPdf = async (file: File) => {
     const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
@@ -49,7 +52,7 @@ const App: React.FC = () => {
   };
 
   const handleFileUpload = async (file: File) => {
-    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    setState((prev: any) => ({ ...prev, isLoading: true, error: null }));
     try {
       let text = '';
       if (file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
@@ -62,10 +65,10 @@ const App: React.FC = () => {
         throw new Error('Unsupported file type. Please upload a .docx, .pdf, or .txt file.');
       }
       
-      setState(prev => ({ ...prev, draft: text, isLoading: false }));
+      setState((prev: any) => ({ ...prev, draft: text, isLoading: false }));
       setGoogleDocLink('');
     } catch (err: any) {
-      setState(prev => ({ ...prev, error: err.message, isLoading: false }));
+      setState((prev: any) => ({ ...prev, error: err.message, isLoading: false }));
     }
   };
 
@@ -81,19 +84,17 @@ const App: React.FC = () => {
     
     if (!submission.trim()) return;
 
-    setState(prev => ({ ...prev, isLoading: true, error: null, evaluation: null }));
+    setState((prev: any) => ({ ...prev, isLoading: true, error: null, evaluation: null }));
     try {
-      // Pass the local API key if provided, otherwise rely on process.env
       const result = await evaluateArticle(submission, apiKey || undefined);
-      setState(prev => ({ ...prev, evaluation: result, isLoading: false }));
+      setState((prev: any) => ({ ...prev, evaluation: result, isLoading: false }));
     } catch (err: any) {
-      setState(prev => ({ ...prev, error: err.message, isLoading: false }));
+      setState((prev: any) => ({ ...prev, error: err.message, isLoading: false }));
     }
   };
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
-      {/* Settings Modal */}
       {showSettings && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
@@ -210,7 +211,7 @@ const App: React.FC = () => {
                 className="w-full h-80 p-4 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none transition-all outline-none text-gray-700 leading-relaxed"
                 placeholder={googleDocLink ? "Add any specific instructions or notes for the editor here..." : "Paste your draft or drag & drop a .docx/.pdf here..."}
                 value={state.draft}
-                onChange={(e) => setState(prev => ({ ...prev, draft: e.target.value }))}
+                onChange={(e) => setState((prev: any) => ({ ...prev, draft: e.target.value }))}
               />
             </div>
 
@@ -284,7 +285,7 @@ const App: React.FC = () => {
                 <div className="bg-amber-500 px-6 py-4"><h3 className="text-white font-bold text-lg">Section 2: Editor's Notes</h3></div>
                 <div className="p-6">
                   <ul className="space-y-4">
-                    {state.evaluation.editorNotes.map((note, idx) => (
+                    {state.evaluation.editorNotes.map((note: string, idx: number) => (
                       <li key={idx} className="flex items-start group">
                         <span className="flex-shrink-0 w-8 h-8 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center font-bold text-sm mr-3">{idx + 1}</span>
                         <p className="text-gray-700 leading-relaxed pt-1">{note}</p>
@@ -313,7 +314,7 @@ const App: React.FC = () => {
                     Note: Edits for tone, flow, and formatting are <strong>bolded</strong>.
                   </div>
                   <div className="text-gray-800 whitespace-pre-wrap leading-relaxed font-serif">
-                    {state.evaluation.polishedDraft.split('**').map((part, i) => 
+                    {(state.evaluation.polishedDraft as string).split('**').map((part, i) => 
                       i % 2 === 1 ? <strong key={i} className="text-blue-700 bg-blue-50 px-1 rounded font-bold">{part}</strong> : part
                     )}
                   </div>

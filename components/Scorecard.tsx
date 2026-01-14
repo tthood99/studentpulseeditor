@@ -1,20 +1,12 @@
 
-import React from 'react';
-import { EvaluationResult } from '../types';
-
-interface ScorecardProps {
-  scorecard: EvaluationResult['scorecard'];
-  rating: EvaluationResult['readinessRating'];
-}
-
-const CheckIcon = ({ checked }: { checked: boolean }) => (
+const CheckIcon = ({ checked }) => (
   <span className={`mr-2 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded border ${checked ? 'bg-green-100 border-green-500 text-green-700' : 'bg-gray-100 border-gray-300 text-gray-400'}`}>
     {checked ? <i className="fas fa-check text-xs"></i> : <i className="fas fa-times text-xs"></i>}
   </span>
 );
 
-export const Scorecard: React.FC<ScorecardProps> = ({ scorecard, rating }) => {
-  const getRatingColor = (r: string) => {
+export const Scorecard = ({ scorecard, rating }) => {
+  const getRatingColor = (r) => {
     switch (r) {
       case 'Ready for Review': return 'bg-green-100 text-green-800 border-green-200';
       case 'Needs Minor Polish': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
