@@ -12,9 +12,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     
-    <!-- React & ReactDOM (UMD) - Loading version 18 for best compatibility with Babel standalone -->
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- React & ReactDOM (UMD) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
     <!-- Babel for browser-side TSX transpilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -34,24 +34,246 @@
     <div id="root"></div>
     
     <script>
-      // Initialize PDF.js worker
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     </script>
 
-    <!-- The App Logic -->
     <script type="text/babel" data-type="module">
-      import App from './App.tsx';
+      import { GoogleGenAI, Type } from "@google/genai";
 
-      const rootElement = document.getElementById('root');
-      if (rootElement) {
-        // Use the global ReactDOM from the UMD script
-        const root = ReactDOM.createRoot(rootElement);
-        root.render(
-          <React.StrictMode>
-            <App />
-          </React.StrictMode>
+      // --- Types & Constants ---
+      const SYSTEM_INSTRUCTION = `
+        You are the Senior Editor for the American Occupational Therapy Association (AOTA) "Student Pulse" e-newsletter. 
+        Your goal is to mentor OT and OTA students to refine their articles for publication.
+        You must evaluate the student's draft against specific criteria:
+        1. Tone: Authentic, conversational, peer-to-peer.
+        2. Format: Bulleted/numbered lists, headings, no walls of text.
+        3. Structure: Strong thesis, supporting points.
+        4. Packaging: Catchy title.
+        5. Length: Max 750 words.
+        6. Admin: Must have signed copyright form.
+
+        Critical Disclaimer: "Please note: Articles are not guaranteed to be published based on a pitch or a first draft."
+
+        Output MUST be JSON format. Fix flow, insert headings, use person-first language, and BOLD your edits using markdown **text**.
+      `;
+
+      // --- Components ---
+      const CheckIcon = ({ checked }) => (
+        <span className={`mr-2 flex-shrink-0 w-6 h-6 flex items-center justify-center rounded border ${checked ? 'bg-green-100 border-green-500 text-green-700' : 'bg-gray-100 border-gray-300 text-gray-400'}`}>
+          {checked ? <i className="fas fa-check text-xs"></i> : <i className="fas fa-times text-xs"></i>}
+        </span>
+      );
+
+      const Scorecard = ({ scorecard, rating }) => {
+        const getRatingColor = (r) => {
+          switch (r) {
+            case 'Ready for Review': return 'bg-green-100 text-green-800 border-green-200';
+            case 'Needs Minor Polish': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+            case 'Needs Structural Rework': return 'bg-red-100 text-red-800 border-red-200';
+            default: return 'bg-gray-100 text-gray-800 border-gray-200';
+          }
+        };
+
+        return (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+            <div className="bg-blue-600 px-6 py-4">
+              <h3 className="text-white font-bold text-lg">Section 1: The Pulse Readiness Scorecard</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center">
+                  <CheckIcon checked={scorecard.conversationalTone} />
+                  <span className="text-gray-700 text-sm">Conversational Tone</span>
+                </div>
+                <div className="flex items-center">
+                  <CheckIcon checked={scorecard.scannability} />
+                  <span className="text-gray-700 text-sm">Scannability</span>
+                </div>
+                <div className="flex items-center">
+                  <CheckIcon checked={scorecard.creativeFormatting} />
+                  <span className="text-gray-700 text-sm">Creative Formatting</span>
+                </div>
+                <div className="flex items-center">
+                  <CheckIcon checked={scorecard.packaging} />
+                  <span className="text-gray-700 text-sm">"Packaging" (Title/Hook)</span>
+                </div>
+                <div className="flex items-center">
+                  <CheckIcon checked={scorecard.adminCheck} />
+                  <span className="text-gray-700 text-sm">Admin Check (Copyright)</span>
+                </div>
+                <div className="flex items-center">
+                  <span className={`mr-2 w-6 h-6 flex items-center justify-center rounded border ${scorecard.wordCount <= 750 ? 'bg-blue-50 border-blue-200 text-blue-600' : 'bg-red-50 border-red-200 text-red-600'}`}>
+                     <i className="fas fa-calculator text-xs"></i>
+                  </span>
+                  <span className="text-gray-700 text-sm">Length: {scorecard.wordCount} / 750 max</span>
+                </div>
+              </div>
+              <div className="mt-6 pt-6 border-t border-gray-100">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-900">Readiness Rating:</span>
+                  <span className={`px-4 py-1 rounded-full text-sm font-bold border ${getRatingColor(rating)}`}>
+                    {rating}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         );
-      }
+      };
+
+      // --- Main App ---
+      const App = () => {
+        const [state, setState] = React.useState({ draft: '', evaluation: null, isLoading: false, error: null });
+        const [googleDocLink, setGoogleDocLink] = React.useState('');
+        const [apiKey, setApiKey] = React.useState(localStorage.getItem('AOTA_API_KEY') || '');
+        const [showSettings, setShowSettings] = React.useState(false);
+        const [showLinkInput, setShowLinkInput] = React.useState(false);
+        const fileInputRef = React.useRef(null);
+
+        const handleEvaluate = async () => {
+          const keyToUse = apiKey || '';
+          if (!keyToUse) {
+            setState(s => ({ ...s, error: 'Please add your API Key in Settings (top right).' }));
+            setShowSettings(true);
+            return;
+          }
+
+          setState(s => ({ ...s, isLoading: true, error: null, evaluation: null }));
+          const ai = new GoogleGenAI({ apiKey: keyToUse });
+
+          try {
+            const response = await ai.models.generateContent({
+              model: "gemini-3-pro-preview",
+              contents: `Draft: ${googleDocLink ? googleDocLink + " " : ""}${state.draft}`,
+              config: {
+                systemInstruction: SYSTEM_INSTRUCTION,
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.OBJECT,
+                  properties: {
+                    scorecard: {
+                      type: Type.OBJECT,
+                      properties: {
+                        conversationalTone: { type: Type.BOOLEAN },
+                        scannability: { type: Type.BOOLEAN },
+                        creativeFormatting: { type: Type.BOOLEAN },
+                        wordCount: { type: Type.INTEGER },
+                        packaging: { type: Type.BOOLEAN },
+                        adminCheck: { type: Type.BOOLEAN }
+                      },
+                      required: ["conversationalTone", "scannability", "creativeFormatting", "wordCount", "packaging", "adminCheck"]
+                    },
+                    readinessRating: { type: Type.STRING },
+                    editorNotes: { type: Type.ARRAY, items: { type: Type.STRING } },
+                    polishedDraft: { type: Type.STRING }
+                  },
+                  required: ["scorecard", "readinessRating", "editorNotes", "polishedDraft"]
+                }
+              }
+            });
+            const data = JSON.parse(response.text);
+            setState(s => ({ ...s, evaluation: data, isLoading: false }));
+            localStorage.setItem('AOTA_API_KEY', apiKey);
+          } catch (err) {
+            setState(s => ({ ...s, error: err.message, isLoading: false }));
+          }
+        };
+
+        const handleFileUpload = async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+          setState(s => ({ ...s, isLoading: true }));
+          try {
+            let text = "";
+            if (file.type.includes("word")) {
+              const res = await window.mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+              text = res.value;
+            } else if (file.type.includes("pdf")) {
+              const pdf = await window.pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+              for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map(it => it.str).join(' ') + "\n";
+              }
+            } else {
+              text = await file.text();
+            }
+            setState(s => ({ ...s, draft: text, isLoading: false }));
+          } catch (err) {
+            setState(s => ({ ...s, error: "Upload failed: " + err.message, isLoading: false }));
+          }
+        };
+
+        return (
+          <div className="max-w-6xl mx-auto px-4 py-8 md:py-12">
+            {showSettings && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                <div className="bg-white rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
+                  <h3 className="text-xl font-bold mb-4">Settings</h3>
+                  <input type="password" value={apiKey} onChange={e => setApiKey(e.target.value)} placeholder="Gemini API Key" className="w-full p-3 border rounded-lg mb-4" />
+                  <button onClick={() => setShowSettings(false)} className="w-full py-3 bg-blue-600 text-white rounded-lg font-bold">Save</button>
+                </div>
+              </div>
+            )}
+
+            <header className="mb-10 text-center relative">
+              <button onClick={() => setShowSettings(true)} className="absolute right-0 top-0 text-gray-400 hover:text-blue-600"><i className="fas fa-cog text-xl"></i></button>
+              <div className="inline-flex items-center justify-center p-4 mb-4 rounded-full bg-blue-100 text-blue-600"><i className="fas fa-hands-holding text-4xl"></i></div>
+              <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Student Pulse Senior Editor</h1>
+              <div className="mt-4 inline-block bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-amber-800 text-sm italic">
+                "Please note: Articles are not guaranteed to be published based on a pitch or a first draft."
+              </div>
+            </header>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="bg-white p-6 rounded-xl shadow-sm border space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="font-bold text-lg">Your Draft</h2>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowLinkInput(!showLinkInput)} className="text-xs px-2 py-1 bg-gray-100 rounded">Link</button>
+                    <button onClick={() => fileInputRef.current.click()} className="text-xs px-2 py-1 bg-gray-100 rounded text-blue-600 font-bold">Upload</button>
+                    <input type="file" ref={fileInputRef} hidden onChange={handleFileUpload} />
+                  </div>
+                </div>
+                {showLinkInput && <input value={googleDocLink} onChange={e => setGoogleDocLink(e.target.value)} placeholder="Google Doc Link" className="w-full p-2 border rounded text-sm bg-blue-50" />}
+                <textarea value={state.draft} onChange={e => setState(s => ({ ...s, draft: e.target.value }))} className="w-full h-80 p-4 border rounded-lg resize-none focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Paste article here..." />
+                <button onClick={handleEvaluate} disabled={state.isLoading} className="w-full py-4 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 disabled:bg-gray-400">
+                  {state.isLoading ? "Reviewing..." : "Evaluate Draft"}
+                </button>
+                {state.error && <p className="text-red-500 text-sm">{state.error}</p>}
+              </div>
+
+              <div className="space-y-6">
+                {state.evaluation ? (
+                  <>
+                    <Scorecard scorecard={state.evaluation.scorecard} rating={state.evaluation.readinessRating} />
+                    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                      <div className="bg-amber-500 p-4 font-bold text-white">Editor's Notes</div>
+                      <div className="p-6 space-y-2">
+                        {state.evaluation.editorNotes.map((n, i) => <div key={i} className="text-sm text-gray-700 flex gap-2"><span className="font-bold text-amber-600">{i+1}.</span>{n}</div>)}
+                      </div>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                      <div className="bg-indigo-600 p-4 font-bold text-white">The Polished Draft</div>
+                      <div className="p-6 text-gray-800 whitespace-pre-wrap leading-relaxed font-serif">
+                        {state.evaluation.polishedDraft.split('**').map((part, i) => i % 2 === 1 ? <strong key={i} className="text-blue-700 bg-blue-50 px-1">{part}</strong> : part)}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-gray-400 p-12 border-2 border-dashed rounded-xl">
+                    <i className="fas fa-clipboard-check text-4xl mb-2 opacity-20"></i>
+                    <p>Submit a draft to receive feedback.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
     </script>
 </body>
 </html>
